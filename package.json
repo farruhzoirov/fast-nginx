@@ -1,0 +1,56 @@
+{
+  "name": "fast-nginx",
+  "version": "1.0.1",
+  "description": "A fast and easy-to-use CLI tool to configure your domain with Nginx using just a single command.",
+  "main": "bin/cli.js",
+  "bin": {
+    "fastnginx": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "node bin/cli.js --help",
+    "prepare": "chmod +x bin/cli.js",
+    "postpublish": "echo '🎉 Successfully published to npm! Users can install with: npm install -g fastnginx'"
+  },
+  "keywords": [
+    "nginx",
+    "cli",
+    "server",
+    "automation",
+    "devops",
+    "ssl",
+    "certbot",
+    "reverse-proxy",
+    "deployment",
+    "vps"
+  ],
+  "author": {
+    "name": "Farruh Zoirov",
+    "email": "fzoirov29@gmail.com",
+    "url": "https://github.com/farruhzoirov"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/farruhzoirov/fast-nginx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/farruhzoirov/fast-nginx/issues"
+  },
+  "homepage": "https://github.com/farruhzoirov/fast-nginx#readme",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^9.4.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "linux"
+  ],
+  "preferGlobal": true,
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ]
+}
