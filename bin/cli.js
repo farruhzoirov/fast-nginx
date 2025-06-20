@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-
 const { Command } = require("commander");
+
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -11,6 +11,8 @@ const program = new Command();
 
 // Version from package.json
 const packageJson = require("../package.json");
+const { sudoWriteFsFile, sudoLinkFsFile, sudoUnlinkFsFile } = require("../src/utils/file.helper");
+const {generateBasicNginxConfigTemplate} = require("../src/templates/basic.template");
 
 // CLI Configuration
 program
@@ -21,7 +23,7 @@ program
   .option("-p, --port <port>", "Port number for the upstream server", "3000")
   .option("--ssl", "Setup SSL certificate with Let's Encrypt")
   .option("--email <email>", "Email for SSL certificate (required with --ssl)")
-  .option("--www", "Include www subdomain in SSL certificate")
+  .option("--www <www>", "Include www subdomain in SSL certificate")
   .option("--force", "Overwrite existing configuration")
   .option("--dry-run", "Show what would be done without executing")
   .option(
@@ -75,196 +77,16 @@ function validateEmail(email) {
 // Template functions
 function getTemplate(templateType, domain, port) {
   const templates = {
-    basic: generateBasicTemplate(domain, port),
-    api: generateApiTemplate(domain, port),
-    spa: generateSpaTemplate(domain, port),
+    basic: generateBasicNginxConfigTemplate(options, domain, port),
+    // api: generateApiTemplate(domain, port),
+    // spa: generateSpaTemplate(domain, port),
   };
 
   return templates[templateType] || templates.basic;
 }
 
-function generateBasicTemplate(domain, port) {
-  return `# FastNginx generated configuration for ${domain}
-# Generated on: ${new Date().toISOString()}
 
-server {
-    listen 80;
-    listen [::]:80;
-    
-    server_name ${domain}${options.www ? ` www.${domain}` : ""};
-    
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    
-    # Proxy configuration
-    location / {
-        proxy_pass http://localhost:${port};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_redirect off;
-        
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-    
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_proxied expired no-cache no-store private must-revalidate auth;
-    gzip_types
-        text/plain
-        text/css
-        text/xml
-        text/javascript
-        application/x-javascript
-        application/xml+rss
-        application/javascript
-        application/json;
-    
-    # Security
-    server_tokens off;
-    
-    # Rate limiting (optional)
-    # limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-    # limit_req zone=api burst=20 nodelay;
-}`;
-}
 
-function generateApiTemplate(domain, port) {
-  return `# FastNginx API configuration for ${domain}
-# Generated on: ${new Date().toISOString()}
-
-server {
-    listen 80;
-    listen [::]:80;
-    
-    server_name ${domain}${options.www ? ` www.${domain}` : ""};
-    
-    # API-specific headers
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    
-    # CORS headers (adjust as needed)
-    add_header Access-Control-Allow-Origin "*" always;
-    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
-    add_header Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization" always;
-    
-    # Handle preflight requests
-    location / {
-        if ($request_method = 'OPTIONS') {
-            add_header Access-Control-Allow-Origin "*";
-            add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS";
-            add_header Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization";
-            add_header Access-Control-Max-Age 1728000;
-            add_header Content-Type "text/plain; charset=utf-8";
-            add_header Content-Length 0;
-            return 204;
-        }
-        
-        proxy_pass http://localhost:${port};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_redirect off;
-        
-        # API timeouts
-        proxy_connect_timeout 30s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
-    }
-    
-    # Rate limiting for API
-    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-    limit_req zone=api burst=20 nodelay;
-    
-    # Disable unnecessary logs for API
-    access_log /var/log/nginx/${domain}_access.log;
-    error_log /var/log/nginx/${domain}_error.log;
-    
-    # Security
-    server_tokens off;
-}`;
-}
-
-function generateSpaTemplate(domain, port) {
-  return `# FastNginx SPA configuration for ${domain}
-# Generated on: ${new Date().toISOString()}
-
-server {
-    listen 80;
-    listen [::]:80;
-    
-    server_name ${domain}${options.www ? ` www.${domain}` : ""};
-    
-    # Security headers for SPA
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    
-    # SPA routing - try files first, then proxy to app
-    location / {
-        try_files $uri $uri/ @proxy;
-    }
-    
-    # Proxy fallback for SPA
-    location @proxy {
-        proxy_pass http://localhost:${port};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_redirect off;
-    }
-    
-    # Static assets caching
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-        try_files $uri @proxy;
-    }
-    
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types
-        text/plain
-        text/css
-        text/xml
-        text/javascript
-        application/x-javascript
-        application/xml+rss
-        application/javascript
-        application/json;
-    
-    # Security
-    server_tokens off;
-}`;
-}
 
 // Enhanced system checks with directory creation
 async function checkSystemRequirements() {
@@ -532,11 +354,11 @@ async function setupSSL(domain, email) {
       try {
         if (fs.existsSync("/etc/debian_version")) {
           execSync(
-            "apt update && apt install certbot python3-certbot-nginx -y",
+            "sudo apt update && apt install certbot python3-certbot-nginx -y",
             { stdio: "inherit" }
           );
         } else if (fs.existsSync("/etc/redhat-release")) {
-          execSync("yum install certbot python3-certbot-nginx -y", {
+          execSync("sudo yum install certbot python3-certbot-nginx -y", {
             stdio: "inherit",
           });
         } else {
@@ -563,7 +385,7 @@ async function setupSSL(domain, email) {
     const domains = options.www
       ? `-d ${domain} -d www.${domain}`
       : `-d ${domain}`;
-    const certbotCmd = `certbot --nginx ${domains} --email ${email} --agree-tos --non-interactive --redirect`;
+    const certbotCmd = `sudo certbot --nginx ${domains} --email ${email} --agree-tos --non-interactive --redirect`;
 
     console.log(chalk.gray(`Running: ${certbotCmd}`));
 
@@ -572,7 +394,7 @@ async function setupSSL(domain, email) {
 
     // Test SSL configuration
     console.log(chalk.yellow("🧪 Testing SSL configuration..."));
-    execSync("nginx -t", { stdio: "pipe" });
+    execSync("sudo ginx -t", { stdio: "pipe" });
     console.log(chalk.green("✅ SSL configuration test passed"));
 
     return true;
@@ -588,7 +410,7 @@ async function setupSSL(domain, email) {
 async function setupNginxServerBlock() {
   const { domain, port, dryRun, force, template } = options;
 
-  console.log(chalk.blue.bold("🚀 FastNginx v" + packageJson.version));
+  console.log(chalk.blue.bold("🚀 fast-nginx v" + packageJson.version));
   console.log(chalk.gray("Nginx Server Block Automation Tool"));
   console.log(chalk.gray("=====================================\n"));
 
@@ -639,7 +461,9 @@ async function setupNginxServerBlock() {
   if (options.ssl && !options.email) {
     console.error(chalk.red("❌ Email is required when using --ssl option"));
     console.log(
-      chalk.gray("   Use: fastnginx -d domain.com --ssl --email your@email.com")
+      chalk.gray(
+        "   Use: fast-nginx -d domain.com --ssl --email your@email.com"
+      )
     );
     process.exit(1);
   }
@@ -666,6 +490,9 @@ async function setupNginxServerBlock() {
   const sitesEnabled = `/etc/nginx/sites-enabled/${domain}`;
 
   console.log(chalk.yellow("\n📝 Generating Nginx configuration..."));
+  console.log("template", template)
+  console.log("domain", domain)
+  console.log("port", port)
   const nginxConfig = getTemplate(template, domain, port);
 
   if (dryRun) {
@@ -705,45 +532,67 @@ async function setupNginxServerBlock() {
 
     // Write configuration file
     console.log(chalk.yellow("📄 Writing configuration file..."));
-    fs.writeFileSync(sitesAvailable, nginxConfig, "utf8");
+    // fs.accessSync(sitesAvailable, nginxConfig, "utf8");
+    await sudoWriteFsFile(`fs.writeFileSync`, sitesAvailable, nginxConfig, (err) => {
+      if (err) {
+        console.error(chalk.red("❌ Failed to write configuration file:"), err);
+        process.exit(1);
+      }
+    });
+    // fs.writeFileSync(sitesAvailable, nginxConfig, "utf8");
     console.log(chalk.green("✅ Configuration written to:", sitesAvailable));
 
     // Create symbolic link
     console.log(chalk.yellow("🔗 Creating symbolic link..."));
-    if (fs.existsSync(sitesEnabled)) {
-      fs.unlinkSync(sitesEnabled);
-    }
-    fs.symlinkSync(sitesAvailable, sitesEnabled);
+    // if (fs.existsSync(sitesEnabled)) {
+    //   await sudoUnlinkFsFile(`fs.unlinkSync`, sitesEnabled, (err) => {
+    //     if (err) {
+    //       console.error(
+    //         chalk.red("❌ Failed to remove existing symlink:"),
+    //         err
+    //       );
+    //       process.exit(1);
+    //     }
+    //   });
+    //   //   fs.unlinkSync(sitesEnabled);
+    // }
+    // fs.symlinkSync(sitesAvailable, sitesEnabled);
+    await sudoLinkFsFile(`fs.symlinkSync`, sitesAvailable, sitesEnabled, (err) => {
+      if (err) {
+        console.error(
+            chalk.red("❌ Failed to link:"),
+            err
+        );
+        process.exit(1);
+      }
+    });
     console.log(chalk.green("✅ Symbolic link created:", sitesEnabled));
 
     // Test Nginx configuration
     console.log(chalk.yellow("🧪 Testing Nginx configuration..."));
     try {
-      execSync("nginx -t", { stdio: "pipe" });
+      execSync(" sudo nginx -t", { stdio: "pipe" });
       console.log(chalk.green("✅ Nginx configuration test passed"));
     } catch (error) {
       console.error(chalk.red("❌ Nginx configuration test failed"));
       console.error(chalk.red(error.message));
 
-      // Cleanup on failure
-      console.log(chalk.yellow("🧹 Cleaning up..."));
-      if (fs.existsSync(sitesEnabled)) fs.unlinkSync(sitesEnabled);
-      if (fs.existsSync(sitesAvailable)) fs.unlinkSync(sitesAvailable);
+
       process.exit(1);
     }
 
     // Reload Nginx
-    if (!options.noReload) {
-      console.log(chalk.yellow("🔄 Reloading Nginx..."));
-      try {
-        execSync("nginx -s reload", { stdio: "pipe" });
-        console.log(chalk.green("✅ Nginx reloaded successfully"));
-      } catch (error) {
-        console.error(chalk.red("❌ Failed to reload Nginx"));
-        console.error(chalk.red(error.message));
-        console.log(chalk.yellow("💡 Try: sudo systemctl reload nginx"));
-      }
-    }
+    // if (!options.noReload) {
+    //   console.log(chalk.yellow("🔄 Reloading Nginx..."));
+    //   try {
+    //     execSync("sudo systemctl reload nginx", { stdio: "pipe" });
+    //     console.log(chalk.green("✅ Nginx reloaded successfully"));
+    //   } catch (error) {
+    //     console.error(chalk.red("❌ Failed to reload Nginx"));
+    //     console.error(chalk.red(error.message));
+    //     console.log(chalk.yellow("💡 Try: sudo systemctl reload nginx"));
+    //   }
+    // }
 
     let sslSuccess = false;
     if (options.ssl) {
@@ -777,7 +626,7 @@ async function setupNginxServerBlock() {
       console.log(chalk.gray(`   2. Point your domain DNS to this server`));
       console.log(
         chalk.gray(
-          `   3. Set up SSL: fastnginx -d ${domain} --ssl --email your@email.com`
+          `   3. Set up SSL: fast-nginx -d ${domain} --ssl --email your@email.com`
         )
       );
     } else if (sslSuccess) {
@@ -800,7 +649,7 @@ async function setupNginxServerBlock() {
     if (error.code === "EACCES") {
       console.log(
         chalk.yellow(
-          "💡 Try running with sudo: sudo fastnginx -d your-domain.com"
+          "💡 Try running with sudo: sudo fast-nginx -d your-domain.com"
         )
       );
     }

@@ -1,10 +1,10 @@
 {
   "name": "fast-nginx",
-  "version": "1.0.1",
+  "version": "1.0.6",
   "description": "A fast and easy-to-use CLI tool to configure your domain with Nginx using just a single command.",
   "main": "bin/cli.js",
   "bin": {
-    "fastnginx": "./bin/cli.js"
+    "fast-nginx": "./bin/cli.js"
   },
   "scripts": {
     "test": "node bin/cli.js --help",
@@ -50,6 +50,7 @@
   "preferGlobal": true,
   "files": [
     "bin/",
+    "src/",
     "README.md",
     "LICENSE"
   ]

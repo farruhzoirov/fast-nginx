@@ -17,7 +17,7 @@ FastNginx is a production-ready CLI tool that automates the entire process of se
 - 🔍 **System validation** - Checks requirements before execution
 - 🎯 **Dry-run mode** - Preview changes before applying
 - 📊 **Detailed logging** - Clear feedback and error handling
-- 🌐 **Cross-platform** - Linux and macOS support
+- 🌐 **Cross-platform** - Linux support
 
 ## 🚀 Quick Start
 
