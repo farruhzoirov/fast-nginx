@@ -47,7 +47,7 @@ async function sudoWriteFsFile(code, filePath, data, callback) {
     });
 }
 
-async function sudoLinkFsFile(code, path1, path2, callback) {
+async function sudoLinkFsFile(path1, path2, callback) {
   const sudoProcess = spawn("sudo", [
     "ln",
     "-s",
@@ -66,8 +66,20 @@ async function sudoLinkFsFile(code, path1, path2, callback) {
   sudoProcess.on("close", (code) => {
     if (code === 0) {
       callback(null);
-    } else {
-      callback(new Error(`Sudo process exited with code ${code}`));
+    }
+
+    if (code === 1) {
+      const removeProcess = spawn("sudo", [
+          "rm", path2
+      ]);
+
+      removeProcess.on("close", (rmCode) => {
+        if (rmCode === 0) {
+          sudoLinkFsFile(path1, path2, callback);
+        } else {
+          callback(new Error(`Failed to remove file: ${path2}`));
+        }
+      });
     }
   });
 

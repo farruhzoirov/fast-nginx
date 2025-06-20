@@ -27,11 +27,11 @@ FastNginx is a production-ready CLI tool that automates the entire process of se
 
 # Install globally via npm
 
-npm install -g fastnginx
+npm install -g fast-nginx
 
 # Verify installation
 
-fastnginx --version
+fast-nginx --version
 \`\`\`
 
 ### Basic Usage
@@ -40,16 +40,12 @@ fastnginx --version
 
 # Basic HTTP setup
 
-sudo fastnginx --domain myapp.com --port 3000
+sudo fast-nginx --domain myapp.com --port 3000
 
 # Complete HTTPS setup
 
-sudo fastnginx --domain myapp.com --port 3000 --ssl --email admin@myapp.com
+sudo fast-nginx --domain myapp.com --port 3000 --ssl --email admin@myapp.com
 
-# API server with CORS
-
-sudo fastnginx --domain api.myapp.com --port 8080 --template api --ssl --email admin@myapp.com
-\`\`\`
 
 ## 📖 Documentation
 
@@ -73,22 +69,9 @@ sudo fastnginx --domain api.myapp.com --port 8080 --template api --ssl --email a
 
 Perfect for most web applications:
 \`\`\`bash
-fastnginx --domain myapp.com --template basic
+fast-nginx --domain myapp.com --template basic
 \`\`\`
 
-#### API Template
-
-Optimized for REST APIs with CORS support:
-\`\`\`bash
-fastnginx --domain api.myapp.com --template api
-\`\`\`
-
-#### SPA Template
-
-Single Page Applications with fallback routing:
-\`\`\`bash
-fastnginx --domain app.myapp.com --template spa
-\`\`\`
 
 ### Examples
 
@@ -98,26 +81,9 @@ fastnginx --domain app.myapp.com --template spa
 
 # Setup a basic website
 
-sudo fastnginx --domain mywebsite.com --port 3000 --ssl --email admin@mywebsite.com
+sudo fast-nginx --domain mywebsite.com --port 3000 --ssl --email admin@mywebsite.com
 \`\`\`
 
-#### API Server
-
-\`\`\`bash
-
-# Setup API server with CORS
-
-sudo fastnginx --domain api.myapp.com --port 8080 --template api --ssl --email admin@myapp.com --www
-\`\`\`
-
-#### React/Vue SPA
-
-\`\`\`bash
-
-# Setup SPA with client-side routing
-
-sudo fastnginx --domain app.myapp.com --port 3000 --template spa --ssl --email admin@myapp.com
-\`\`\`
 
 #### Preview Changes
 
@@ -125,12 +91,12 @@ sudo fastnginx --domain app.myapp.com --port 3000 --template spa --ssl --email a
 
 # See what would be created without executing
 
-fastnginx --domain test.com --ssl --email test@test.com --dry-run
+fast-nginx --domain test.com --ssl --email test@test.com --dry-run
 \`\`\`
 
 ## 🔧 Requirements
 
-- **Operating System**: Linux or macOS
+- **Operating System**: Linux, Ubuntu
 - **Node.js**: 14.0.0 or higher
 - **Nginx**: Installed and running
 - **Permissions**: Root/sudo access for system operations
@@ -157,7 +123,7 @@ sudo apt install nginx -y
 
 # Install FastNginx (that's it!)
 
-sudo npm install -g fastnginx
+sudo npm install -g fast-nginx
 \`\`\`
 
 ### CentOS/RHEL
@@ -175,7 +141,7 @@ sudo yum install nginx -y
 
 # Install FastNginx
 
-sudo npm install -g fastnginx
+sudo npm install -g fast-nginx
 \`\`\`
 
 ## 🛡️ Security Features
@@ -184,9 +150,6 @@ FastNginx includes production-ready security configurations:
 
 - **Security Headers**: X-Frame-Options, X-XSS-Protection, X-Content-Type-Options
 - **SSL/TLS**: Automatic HTTPS redirect and modern cipher suites
-- **Rate Limiting**: Built-in protection against abuse
-- **Server Tokens**: Hidden for security
-- **CORS Support**: Configurable cross-origin policies (API template)
 
 ## 🔍 Troubleshooting
 
@@ -197,7 +160,7 @@ FastNginx includes production-ready security configurations:
 
 # Always run with sudo for system operations
 
-sudo fastnginx --domain myapp.com
+sudo fast-nginx --domain myapp.com
 \`\`\`
 
 **Domain Not Accessible**
@@ -252,7 +215,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 # Clone repository
 
 git clone https://github.com/yourusername/fastnginx.git
-cd fastnginx
+cd fast-nginx
 
 # Install dependencies
 
@@ -260,11 +223,11 @@ npm install
 
 # Make executable
 
-chmod +x bin/fastnginx.js
+chmod +x bin/cli.js
 
 # Test locally
 
-./bin/fastnginx.js --help
+./bin/cli.js --help
 
 # Install globally for testing
 
@@ -284,9 +247,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Stats
 
-![GitHub stars](https://img.shields.io/github/stars/yourusername/fastnginx?style=social)
-![GitHub forks](https://img.shields.io/github/forks/yourusername/fastnginx?style=social)
-![npm downloads](https://img.shields.io/npm/dm/fastnginx)
+![GitHub stars](https://img.shields.io/github/stars/farruhzoirov/fastnginx?style=social)
+![GitHub forks](https://img.shields.io/github/forks/farruhzoirov/fastnginx?style=social)
+![npm downloads](https://img.shields.io/npm/dm/fast-nginx)
 
 ---
 
