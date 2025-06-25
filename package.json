@@ -7,9 +7,7 @@
     "fast-nginx": "./bin/cli.js"
   },
   "scripts": {
-    "test": "node bin/cli.js --help",
-    "prepare": "chmod +x bin/cli.js",
-    "postpublish": "echo '🎉 Successfully published to npm! Users can install with: npm install -g fastnginx'"
+    "test": "node bin/cli.js --help"
   },
   "keywords": [
     "nginx",
@@ -45,7 +43,8 @@
     "node": ">=14.0.0"
   },
   "os": [
-    "linux"
+    "linux",
+    "win32"
   ],
   "preferGlobal": true,
   "files": [
@@ -53,5 +52,8 @@
     "src/",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "prettier": "3.6.1"
+  }
 }
