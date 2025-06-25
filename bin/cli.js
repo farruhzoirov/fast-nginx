@@ -1,21 +1,17 @@
 #!/usr/bin/env node
 const { Command } = require("commander");
-
 const fs = require("fs");
 const { execSync, spawn } = require("child_process");
 const chalk = require("chalk");
-const readline = require("readline");
-
 const program = new Command();
-
-// Version from package.json
 const packageJson = require("../package.json");
-const { sudoWriteFsFile, sudoLinkFsFile } = require("../src/utils/file.helper");
+const { sudoWriteFsFile, sudoLinkFsFile, sudoUnlinkFsFile} = require("../src/utils/file.helper");
 const {generateBasicNginxConfigTemplate} = require("../src/templates/basic.template");
 const checkSystemRequirements = require("../src/validators/system.validator");
 const validateDomain = require("../src/validators/domain.validator");
 const validatePort = require("../src/validators/port.validator");
 const validateEmail = require("../src/validators/email.validator");
+const {askUser} = require("../src/utils/ask.helper");
 
 // CLI Configuration
 program
@@ -39,20 +35,13 @@ program
   .parse();
 
 const options = program.opts();
-// Template functions
 function getTemplate(templateType, domain, port) {
   const templates = {
     basic: generateBasicNginxConfigTemplate(options, domain, port),
-    // api: generateApiTemplate(domain, port),
-    // spa: generateSpaTemplate(domain, port),
   };
-
   return templates[templateType] || templates.basic;
 }
 
-
-
-// SSL Certificate setup with Certbot
 async function setupSSL(domain, email) {
   console.log(
     chalk.yellow("🔒 Setting up SSL certificate with Let's Encrypt...")
@@ -69,13 +58,11 @@ async function setupSSL(domain, email) {
       // Detect OS and install accordingly
       try {
         if (fs.existsSync("/etc/debian_version")) {
-          console.log("1")
           execSync(
             "sudo apt update && sudo apt install certbot python3-certbot-nginx -y",
             { stdio: "inherit" }
           );
         } else if (fs.existsSync("/etc/redhat-release")) {
-          console.log("2")
           execSync("sudo yum install certbot python3-certbot-nginx -y", {
             stdio: "inherit",
           });
@@ -125,47 +112,44 @@ async function setupSSL(domain, email) {
   }
 }
 
-// Main execution function
 async function setupNginxServerBlock() {
   const { domain, port, dryRun, force, template } = options;
-
   console.log(chalk.blue.bold("🚀 fast-nginx v" + packageJson.version));
   console.log(chalk.gray("Nginx Server Block Automation Tool"));
   console.log(chalk.gray("=====================================\n"));
-
-  // System requirements check
   console.log(chalk.yellow("🔍 Checking system requirements..."));
   const systemChecks = await  checkSystemRequirements(options);
-
+  execSync("sudo systemctl stop nginx", { stdio: "inherit" });
+  let color;
+  let icon;
   for (const check of systemChecks) {
-    const icon =
-      check.status === "ok" ? "✅" : check.status === "warning" ? "⚠️" : "❌";
-    const color =
-      check.status === "ok"
-        ? "green"
-        : check.status === "warning"
-        ? "yellow"
-        : "red";
+    switch (check.status) {
+      case "ok":
+        color = "green";
+        icon = "✅"
+        break;
+      case "warning":
+        color = "yellow";
+        icon = "⚠️"
+        break;
+      case "error":
+        color = "red";
+        icon = "❌"
+        process.exit(1);
+        break;
+      default:
+        color = "red"
+        icon =  "❌"
+    }
+
     console.log(chalk[color](`${icon} ${check.name}: ${check.message}`));
   }
 
-  // Check for critical errors
-  const criticalErrors = systemChecks.filter(
-    (check) => check.status === "error"
-  );
-  if (criticalErrors.length > 0 && !dryRun) {
-    console.log(
-      chalk.red("\n❌ Critical system requirements not met. Aborting.")
-    );
-    process.exit(1);
-  }
-
-  // Input validation
   console.log(chalk.yellow("📋 Validating inputs..."));
 
   if (!validateDomain(domain)) {
     console.error(chalk.red("❌ Invalid domain format:", domain));
-    console.log(chalk.gray("   Example: myapp.com or api.myapp.com"));
+    console.log(chalk.gray("   Example: myapp.uz , api.myapp.uz"));
     process.exit(1);
   }
 
@@ -179,7 +163,7 @@ async function setupNginxServerBlock() {
     console.error(chalk.red("❌ Email is required when using --ssl option"));
     console.log(
       chalk.gray(
-        "   Use: fast-nginx -d domain.com --ssl --email your@email.com"
+        "Use: fast-nginx --domain domain.com --port [your app port] --ssl --email your@email.com --yes"
       )
     );
     process.exit(1);
@@ -202,78 +186,40 @@ async function setupNginxServerBlock() {
     }
   }
 
-  // File paths
   const sitesAvailable = `/etc/nginx/sites-available/${domain}`;
   const sitesEnabled = `/etc/nginx/sites-enabled/${domain}`;
 
   console.log(chalk.yellow("\n📝 Generating Nginx configuration..."));
-  console.log("template", template)
-  console.log("domain", domain)
-  console.log("port", port)
   const nginxConfig = getTemplate(template, domain, port);
 
-  if (dryRun) {
-    console.log(
-      chalk.blue("\n🔍 DRY RUN - Configuration that would be created:")
-    );
-    console.log(chalk.gray("─".repeat(60)));
-    console.log(nginxConfig);
-    console.log(chalk.gray("─".repeat(60)));
-    console.log(chalk.blue(`\n📁 Would write to: ${sitesAvailable}`));
-    console.log(chalk.blue(`🔗 Would create symlink: ${sitesEnabled}`));
-    if (!options.noReload) {
-      console.log(chalk.blue("🔄 Would reload Nginx"));
-    }
-    if (options.ssl) {
-      console.log(
-        chalk.blue(
-          `🔒 Would setup SSL for: ${domain}${
-            options.www ? " and www." + domain : ""
-          }`
-        )
-      );
-    }
-    return;
-  }
-
   try {
-    // Check if config already exists
     if (fs.existsSync(sitesAvailable) && !force) {
-      console.log(
-        chalk.yellow(`⚠️  Configuration for ${domain} already exists`)
-      );
-      console.log(chalk.gray(`   Location: ${sitesAvailable}`));
-      console.log(chalk.gray("   Use --force to overwrite"));
-      process.exit(1);
+      const userResponse = await askUser(options, ` ⚠️ Configuration for ${domain} already exists. Overwrite?`);
+      if (!userResponse) {
+        console.log(chalk.yellow(`⚠️ Operation cancelled by user`));
+        console.log(chalk.gray(`   Existing configuration at: ${sitesAvailable}`));
+        console.log(chalk.gray(`   Use --force flag to override without prompting`));
+        process.exit(0);
+        }
+      await sudoUnlinkFsFile(sitesAvailable);
     }
-
-    // Write configuration file
     console.log(chalk.yellow("📄 Writing configuration file..."));
-    // fs.accessSync(sitesAvailable, nginxConfig, "utf8");
-    await sudoWriteFsFile(`fs.writeFileSync`, sitesAvailable, nginxConfig, (err) => {
+    await sudoWriteFsFile(sitesAvailable, nginxConfig, (err) => {
       if (err) {
         console.error(chalk.red("❌ Failed to write configuration file:"), err);
         process.exit(1);
       }
     });
-    // fs.writeFileSync(sitesAvailable, nginxConfig, "utf8");
     console.log(chalk.green("✅ Configuration written to:", sitesAvailable));
-
-    // Create symbolic link
     console.log(chalk.yellow("🔗 Creating symbolic link..."));
-    // if (fs.existsSync(sitesEnabled)) {
-    //   await sudoUnlinkFsFile(`fs.unlinkSync`, sitesEnabled, (err) => {
-    //     if (err) {
-    //       console.error(
-    //         chalk.red("❌ Failed to remove existing symlink:"),
-    //         err
-    //       );
-    //       process.exit(1);
-    //     }
-    //   });
-    //   //   fs.unlinkSync(sitesEnabled);
-    // }
-    // fs.symlinkSync(sitesAvailable, sitesEnabled);
+
+    if (fs.existsSync(sitesEnabled) && !force) {
+      const userResponse = await askUser(options, ` ⚠️ Nginx enabled file already exists. Overwrite?`);
+      if (userResponse) {
+        await sudoUnlinkFsFile(sitesEnabled);
+      }
+    }
+    await sudoUnlinkFsFile(sitesEnabled);
     await sudoLinkFsFile(sitesAvailable, sitesEnabled, (err) => {
       if (err) {
         console.error(
@@ -284,37 +230,14 @@ async function setupNginxServerBlock() {
       }
     });
     console.log(chalk.green("✅ Symbolic link created:", sitesEnabled));
-
     // Test Nginx configuration
     console.log(chalk.yellow("🧪 Testing Nginx configuration..."));
-    // try {
-    //   execSync(" sudo nginx -t", { stdio: "pipe" });
-    //   console.log(chalk.green("✅ Nginx configuration test passed"));
-    // } catch (error) {
-    //   console.error(chalk.red("❌ Nginx configuration test failed"));
-    //   console.error(chalk.red(error.message));
-    //   process.exit(1);
-    // }
-
-    // Reload Nginx
-    // if (!options.noReload) {
-    //   console.log(chalk.yellow("🔄 Reloading Nginx..."));
-    //   try {
-    //     execSync("sudo systemctl reload nginx", { stdio: "pipe" });
-    //     console.log(chalk.green("✅ Nginx reloaded successfully"));
-    //   } catch (error) {
-    //     console.error(chalk.red("❌ Failed to reload Nginx"));
-    //     console.error(chalk.red(error.message));
-    //     console.log(chalk.yellow("💡 Try: sudo systemctl reload nginx"));
-    //   }
-    // }
 
     let sslSuccess = false;
-    if (options.ssl) {
+    if (options?.ssl) {
       sslSuccess = await setupSSL(domain, options.email);
     }
 
-    // Success message
     console.log(
       chalk.green.bold("\n🎉 Server block setup completed successfully!")
     );
@@ -326,9 +249,10 @@ async function setupNginxServerBlock() {
     console.log(chalk.white(`   Config: ${sitesAvailable}`));
 
     if (sslSuccess) {
+      execSync("sudo systemctl start nginx", { stdio: "inherit" });
       console.log(chalk.green(`   SSL: ✅ HTTPS enabled`));
       console.log(chalk.white(`   URL: https://${domain}`));
-    } else if (options.ssl) {
+    } else if (options?.ssl) {
       console.log(
         chalk.yellow(`   SSL: ⚠️ Setup attempted but may have failed`)
       );
@@ -338,21 +262,20 @@ async function setupNginxServerBlock() {
     console.log(chalk.gray(`   1. Ensure your app is running on port ${port}`));
 
     if (!sslSuccess && !options.ssl) {
-      console.log(chalk.gray(`   2. Point your domain DNS to this server`));
+      console.log(chalk.gray(`2. Point your domain DNS to this server`));
       console.log(
         chalk.gray(
           `   3. Set up SSL: fast-nginx -d ${domain} --ssl --email your@email.com`
         )
       );
     } else if (sslSuccess) {
-      console.log(chalk.gray(`   2. Your site is ready at https://${domain}`));
+      console.log(chalk.gray(`2. Your site is ready at https://${domain}`));
       console.log(
         chalk.gray(
           `   3. SSL will auto-renew (check: sudo certbot renew --dry-run)`
         )
       );
     }
-
     console.log(
       chalk.gray(
         `   4. Monitor logs: sudo tail -f /var/log/nginx/${domain}_*.log`
@@ -360,7 +283,6 @@ async function setupNginxServerBlock() {
     );
   } catch (error) {
     console.error(chalk.red("❌ Error during setup:"), error.message);
-
     if (error.code === "EACCES") {
       console.log(
         chalk.yellow(
@@ -368,12 +290,10 @@ async function setupNginxServerBlock() {
         )
       );
     }
-
     process.exit(1);
   }
 }
 
-// Handle uncaught errors gracefully
 process.on("uncaughtException", (error) => {
   console.error(chalk.red("❌ Unexpected error:"), error.message);
   console.log(
@@ -389,7 +309,6 @@ process.on("unhandledRejection", (reason, promise) => {
   process.exit(1);
 });
 
-// Run the main function
 setupNginxServerBlock().catch((error) => {
   console.error(chalk.red("❌ Setup failed:"), error.message);
   process.exit(1);
